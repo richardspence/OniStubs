@@ -1,0 +1,538 @@
+﻿<#@ template hostspecific="false" language="C#" compilerOptions="" #>
+<#@ output extension=".cs" #>
+<#@ assembly name="System.Core, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" #>
+<#@ assembly name="mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" #>
+<#@ assembly name="System.IO" #>
+<#@ assembly name="System" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Reflection" #>
+<#@ import namespace="System.Collections.Generic" #>
+using System;
+using Unity;
+<#
+
+	var ev = System.Environment.GetEnvironmentVariable("ProgramFiles(x86)");
+	var path = @"\Steam\steamapps\common\OxygenNotIncluded\OxygenNotIncluded_Data\Managed\";
+	var file = "Assembly-CSharp.dll";
+     AppDomain.CurrentDomain.ReflectionOnlyAssemblyResolve // <---- add me
+             += (e, d)=>OnReflectionOnlyResolve(d); 
+
+	var assem = System.Reflection.Assembly.ReflectionOnlyLoadFrom(ev+path+file);
+    //var assem2 = System.Reflection.Assembly.LoadFile(ev+path+"Assembly-CSharp-firstpass.dll");
+    Type[] types;
+	try{
+        types = assem.GetTypes();
+    }
+    catch(ReflectionTypeLoadException e){
+        types = e.Types;
+    }
+	foreach(var type in types){
+    if(type == null) continue;
+        if(!(type.IsPublic || type.IsInterface)){
+            continue;
+        }
+    var hasNamespace = type.Namespace != null;
+     if(hasNamespace){
+         #>
+         namespace  <#= type.Namespace #> {
+         <#
+     }
+     if(!type.Name.Contains("Diet") ){
+         //continue;
+     }
+     GenTopLevelClass(type);
+#>
+
+<#
+    if(hasNamespace){
+        #>
+            }
+        <#
+    }
+}
+#>
+
+<#+
+void GenEnum(Type type, string acc){
+    #>
+    <#= acc #> enum  <#= GenTypeName(type, false) #> {
+    <#+ 
+        var names = Enum.GetNames(type);
+        foreach(var name in names){
+            #>
+            <#= name#>,
+            <#+
+        }
+    #>
+    }
+    <#+
+}
+
+void GenTopLevelClass(Type type){
+    
+    var accessor = new List<string>();
+    accessor.Add("");
+    if(type.IsPublic || type.IsNestedPublic){
+        accessor.Add("public");
+    }else if(type.IsNestedFamily){
+        accessor.Add("protected");
+    }
+
+    if(!type.IsInterface && type.IsAbstract){
+           accessor.Add("abstract");
+    }
+        if(!type.IsInterface && !type.IsValueType && !type.IsAbstract && type.IsSealed){
+           accessor.Add("sealed");
+    }
+    var acc = accessor.Aggregate((l, r)=> l+" "+r);
+    if(type.BaseType == typeof(Enum)){
+        GenEnum(type, acc);
+        return;
+    }
+    if(type.BaseType == typeof(MulticastDelegate)){
+         #>
+    public delegate void <#= GenTypeName(type, false) #> ();
+    <#+
+        return;
+    }
+
+    var typeName = "class";
+    if(type.IsInterface){
+        typeName = "interface";
+    }else if(type.IsValueType){
+           typeName = "struct";
+    }
+
+    #>
+    <#= acc #> <#=typeName #> <#= GenTypeName(type, false) #> 
+	 <#+
+        Type[] btypes = new Type[0];
+        if(type.BaseType != null && type.BaseType != typeof(object)  && type.BaseType != typeof(ValueType)){
+            btypes = Enumerable.Repeat(type.BaseType, 1).ToArray();
+        }
+        else{
+
+        }
+		var iTypes = btypes.Concat(type.GetInterfaces()).Select(p=>GenFullTypeName(p));
+        if(iTypes.Any()){
+            #>
+			: <#= iTypes.Aggregate((l,r)=>l+"," +r) #> <#=GenTypeConstraints(type)#> 
+            <#+
+        }
+		#>
+        {
+        <#+
+       
+		foreach(var member in type.GetMembers(BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)){
+			var keyWord = string.Empty;
+            if(member.Name.Contains("b__2_0")){
+
+            }
+			switch (member.MemberType)
+            {
+                case MemberTypes.Constructor:
+                    GenConstructor(member as ConstructorInfo);
+                     break;
+                case MemberTypes.Method:
+                    var methodInfo = member as MethodInfo;
+                    if((methodInfo.IsPrivate && (!methodInfo.Name.Contains('.') || methodInfo.Name.Contains('<'))) || methodInfo.IsSpecialName)
+                        break;
+                    GenFunction(member as MethodInfo); 
+                    break;
+                case MemberTypes.Event:
+                    break;
+                case MemberTypes.Field:
+                    var fieldInfo = member as FieldInfo;
+                    if(fieldInfo.IsPrivate)
+                        break;
+                    try{
+                    var ft = fieldInfo.FieldType;
+                #>
+                    <#= type.IsInterface ? string.Empty : fieldInfo.IsPublic ? "public" : "protected" #> <#= fieldInfo.IsStatic ? "static": string.Empty #> <#=  GenFullTypeName(ft) #> <#= NormalizeName(fieldInfo.Name) #>;
+                <#+
+                    }catch (Exception e){
+                        #>
+                        /* <#= e.ToString() #>*/
+                        <#+
+                    }
+                    break;
+                case MemberTypes.Property:
+                    var propInfo = member as PropertyInfo;
+                    try{
+                    var propType = propInfo.PropertyType;
+                 #> <#= type.IsInterface || propInfo.Name.Contains('.') ? string.Empty : "public" #>  <#=  GenFullTypeName(propType) #> <#= member.Name #>
+                   
+                 {
+                    <#+
+                    if(propInfo.CanRead){
+                        if(type.IsInterface){
+                            #>
+                            get;
+                        <#+
+                        }else{
+
+                        #>
+                            get { throw new System.NotImplementedException(); }
+                        <#+
+                        }
+                    }
+                    if(propInfo.CanWrite){
+                        if(type.IsInterface){
+                            #>
+                            set;
+                        <#+
+                        }else{
+                           #>
+                            set {  }
+                        <#+
+                        }
+                    }
+                    #>
+                 }
+                 <#+
+                 }catch (Exception e){
+
+                 }
+                    break;
+                case MemberTypes.TypeInfo:
+                    break;
+                case MemberTypes.Custom:
+                    break;
+                case MemberTypes.NestedType:
+                    var t = member as Type;
+                    
+                    
+                    if(t.Name.Contains("ApproachSubState") ){
+
+        }
+                    if(t==null)
+                        break;
+                   
+                    if(!t.IsNestedPublic && !t.IsNestedFamily && !t.IsInterface){
+                        break;
+                    }
+                       GenTopLevelClass(t);
+                    break;
+                case MemberTypes.All:
+                    break;
+                default:
+                    break;
+            }
+	    }
+#>
+}
+<#+
+}
+
+    void GenFunction(MethodInfo memberInfo){
+    try{
+
+        var funcName = GenTypeName(memberInfo);
+        var parameters = memberInfo.GetParameters();
+        /*var returnType = memberInfo.ReturnType;
+        if(funcName == ".ctor"){
+            funcName = type.Name;
+            returnType = null;
+        }*/
+        // returnType != null ? returnType.FullName : string.Empty
+        var paramString = string.Empty; 
+        if(parameters.Any()){
+             paramString = parameters.Select(p=>(p.IsOut? "out " : string.Empty ) + GenFullTypeName(p.ParameterType) + " "
+                                + NormalizeName(p.Name) ).Aggregate((l, h) => l+", "+ h);
+        }
+        var isOverride =memberInfo.GetBaseDefinition().DeclaringType != memberInfo.DeclaringType;
+        #>
+        <#= memberInfo.DeclaringType.IsInterface || memberInfo.Name.Contains(".") ? "" : memberInfo.IsPublic ? "public": "protected" #> <#= memberInfo.IsStatic ? "static": string.Empty #>  <#= !isOverride && memberInfo.DeclaringType.IsClass && !memberInfo.Name.Contains(".") && memberInfo.IsVirtual? "virtual" : string.Empty #>  <#= !memberInfo.DeclaringType.IsInterface && memberInfo.IsAbstract  &&! memberInfo.IsVirtual? "abstract" : string.Empty #> <#= isOverride ? "override": "" #> <#= GenFullTypeName(memberInfo.ReturnType) #> <#= funcName #> (<#= paramString#>) <#=GenTypeConstraints(memberInfo)#> 
+        <#+
+            if(!memberInfo.DeclaringType.IsInterface && (! memberInfo.IsAbstract || memberInfo.IsVirtual)){
+            #>
+
+            {
+              throw new System.NotImplementedException();
+            }
+            
+        <#+
+        }else{
+            #>
+            ;
+            <#+
+        }
+            
+        
+        }catch(Exception e){
+             #>
+            /*<#= e.ToString() #>*/
+            <#+
+        }
+    }
+
+#>
+
+<#+
+    string GenDefaultLValue(Type type){
+        if(type.IsValueType || type.IsGenericParameter){
+            return "default("+GenFullTypeName(type)+")";
+        }
+        return "null";
+    }
+     [System.Security.SecurityCritical]
+    void GenConstructor(ConstructorInfo constructor){
+         var accessor = new List<string>();
+         accessor.Add("");
+        if(constructor.IsPublic ){
+            accessor.Add("public");
+        }else if(constructor.IsFamily){
+            accessor.Add("protected");
+        }
+        if(constructor.IsStatic){
+               accessor.Add("static");
+        }
+        try{
+
+        var acc = accessor.Aggregate((l, r)=> l+" "+r);
+       
+        var parameters = constructor.GetParameters();
+        var paramString = string.Empty; 
+        if(parameters.Any()){
+             paramString = parameters.Select(p=>(p.IsOut? "out " : string.Empty ) + GenFullTypeName(p.ParameterType) + " "
+                                + NormalizeName(p.Name) ).Aggregate((l, h) => l+", "+ h);
+        }
+
+        var baseInvoke = string.Empty;
+        var baseType = constructor.DeclaringType.BaseType;
+        if(!constructor.IsStatic && baseType != null && baseType != typeof(object)  &&baseType != typeof(ValueType)){
+            var bCtors = constructor.DeclaringType.BaseType.GetConstructors();
+            var bCtor = bCtors.Where(c=>c.IsPublic).FirstOrDefault()
+                        ?? bCtors.Where(c=>c.IsFamily).FirstOrDefault()
+                        ?? bCtors.FirstOrDefault();
+            if(bCtor!= null && bCtor.GetParameters().Any()){
+                var baseParams =  bCtor.GetParameters().Select(p=>GenDefaultLValue(p.ParameterType)).Aggregate((l,r)=> l+", "+r);
+                baseInvoke = ": base("+baseParams+")";
+            }
+           
+        }
+        var ctorName = constructor.DeclaringType.Name.Split('`')[0];
+        #>
+            <#= acc #> <#= ctorName #> (<#= paramString #>) <#= baseInvoke#> {
+                throw new System.NotImplementedException();
+            }
+        <#+
+        }catch(Exception e){
+
+        }
+    }
+
+
+
+    string insertGeneric(string  name, string gp){
+        name = name.Replace("&", "");
+        name = name.Split('`')[0];
+        gp =  "<"+gp +">";
+        var com = name.IndexOf('[');
+        
+        if(com != -1){
+            return name.Substring(0, com) + gp +  name.Substring(com);
+        }else{
+            return name + gp;
+        }
+    }
+
+    string GenTypeName(Type t, bool includeNested = true, System.Collections.Generic.IEnumerable<Type> typeArgs = null){
+        var name = t.Name;
+        if(t.IsArray){
+            return GenTypeName(t.GetElementType(), includeNested, typeArgs) + "[]";
+        }
+        if(name.Contains("&")){
+            return GenTypeName(t.GetElementType(), includeNested, typeArgs);
+        }
+        if(name.Contains("Handle")){
+
+        }
+        typeArgs = typeArgs ?? t.GetGenericArguments().AsEnumerable();
+         if(includeNested && t.FullName != null && t.FullName.Contains("+") && ! t.FullName.Contains("Culture=")){
+             name =  t.FullName.Replace("#", ".").Replace("+", ".");
+          
+         }else if(includeNested &&  t.Namespace != null && !t.IsGenericParameter){
+             name = t.Namespace +"."+name;
+         }
+         var skipArgs = 0;
+         if(t.ReflectedType != null && !t.IsGenericParameter ){
+            if(t.ReflectedType.IsGenericType){
+                skipArgs += t.ReflectedType.GetGenericArguments().Length;
+            }
+             if(includeNested){
+                 name = GenTypeName(t.ReflectedType, includeNested, typeArgs.Take(skipArgs))+"." + t.Name;
+             }
+             typeArgs = typeArgs.Skip(skipArgs);
+             var s = name;
+         }
+        name = name.Replace("&", "");
+        name = name.Replace("#", ".");
+        name = name.Replace("*", "");
+        if(typeArgs.Any() && (t.Name.Contains("`"))){
+            var gp = typeArgs.Select(s=>GenFullTypeName(s)).Aggregate((l, h) => l+", "+ h);
+            return insertGeneric(name, gp);
+        }
+        if(t == typeof(void)){
+            return "void";
+        }
+        return name;
+    }
+
+    
+  
+
+    string BuildCSharpFullName(Type typeInfo, List<Type> typeArgs, StringBuilder result = null)
+    {
+        if(result == null){
+            result = new StringBuilder();
+        }
+        var localTypeParamCount = typeInfo.GetTypeInfo().GenericTypeParameters.Length;
+        var localTypeArgCount = typeInfo.GetTypeInfo().GenericTypeArguments.Length;
+
+        var typeParamCount = Math.Max(localTypeParamCount, localTypeArgCount);
+
+        if (typeArgs == null)
+            typeArgs = new List<Type>(typeInfo.GetTypeInfo().GenericTypeArguments);
+
+
+        if (typeInfo.IsNested)
+        {
+            BuildCSharpFullName(typeInfo.DeclaringType, typeArgs, result);
+        }
+        else
+        {
+            result.Append(typeInfo.Namespace);
+        }
+
+        result.Append(".");
+        foreach (var c in typeInfo.Name)
+        {
+            if (c == '`') //we found a generic
+                break;
+            result.Append(c);
+        }
+
+        if (localTypeParamCount > 0)
+        {
+            result.Append("<");
+
+            for (int i = 0; i < localTypeParamCount; i++)
+            {
+                if (i > 0)
+                    result.Append(",");
+                BuildCSharpFullName(typeArgs[i], null, result); //note that we are "eating" the typeArgs that we passed to us from the nested type.
+            }
+            typeArgs.RemoveRange(0, localTypeParamCount); //remove the used args
+
+
+            result.Append(">");
+        }
+        else if (localTypeArgCount > 0 && typeArgs.Count > 0)
+        {
+            result.Append("<");
+
+            for (int i = 0; i < Math.Min(localTypeArgCount, typeArgs.Count); i++)
+            {
+                if (i > 0)
+                    result.Append(",");
+                BuildCSharpFullName(typeArgs[i], null, result);
+            }
+            result.Append(">");
+        }
+
+        return result.ToString();
+    }
+
+
+     string GenTypeName(MethodInfo t){
+         var name = t.Name.Replace("&", "");
+        
+         if(t.GetGenericArguments().Any()){
+            var gp = t.GetGenericArguments().Select(s=>GenFullTypeName(s)).Aggregate((l, h) => l+", "+ h);
+            return insertGeneric(name, gp);
+        }
+        return name;
+    }
+
+    string NormalizeName(string name){
+        if(name == "object"){
+            return "_object";
+        }
+        return name;
+    }
+
+    string GenFullTypeName(Type t){
+        if(t == typeof(void)){
+            return "void";
+        }
+        
+        //if(t.Namespace == null || t.FullName == null)
+        return GenTypeName(t);
+        var ns = t.Namespace;
+        return ns + "."+GenTypeName(t);
+    }
+
+
+    string GenTypeConstraints(Type t){
+    StringBuilder res = new StringBuilder();
+        if(t.IsGenericTypeDefinition){
+            var parameters = t.GetGenericArguments().AsEnumerable();
+            if(t.ReflectedType != null)
+            {
+               parameters = parameters.Skip(t.ReflectedType.GetGenericArguments().Length);
+            }
+            foreach(var p in parameters){
+                if(p.IsGenericParameter){
+                    var c = p.GetGenericParameterConstraints();
+                    if(c.Any()){
+                        res.Append("where "+p.Name+" : ");
+                        res.AppendLine(c.Select(s=>GenTypeName(s)).ToArray().Aggregate((l,r)=>l+", "+r));
+                    }
+                }
+            }
+        }
+        return res.ToString();
+    }
+
+    string GenTypeConstraints(MethodInfo t){
+    StringBuilder res = new StringBuilder();
+            var parameters = t.GetGenericArguments();
+            foreach(var p in parameters){
+                if(p.IsGenericParameter){
+                    var c = p.GetGenericParameterConstraints();
+                    if(c.Any()){
+                        res.Append("where "+p.Name+" : ");
+                        string [] x;
+                        res.AppendLine(c.Select(s=>GenTypeName(s)).ToArray().Aggregate((l,r)=>l+", "+r));
+                    }
+                }
+            }
+        return res.ToString();
+    }
+   
+#>
+
+<#+
+    Assembly OnReflectionOnlyResolve(ResolveEventArgs args)
+{
+     Assembly loadedAssembly =
+         AppDomain.CurrentDomain.ReflectionOnlyGetAssemblies()
+             .FirstOrDefault(
+               asm => string.Equals(asm.FullName, args.Name,
+                   StringComparison.OrdinalIgnoreCase));
+
+     if (loadedAssembly != null)
+     {
+        return loadedAssembly;
+     }
+     var ev = System.Environment.GetEnvironmentVariable("ProgramFiles(x86)");
+	var path = @"\Steam\steamapps\common\OxygenNotIncluded\OxygenNotIncluded_Data\Managed\";
+    
+        var asmName = args.Name.Split(',');
+        var assemblyPath = ev+path + asmName[0] + ".dll";
+         return Assembly.ReflectionOnlyLoadFrom(assemblyPath);
+}
+
+#>

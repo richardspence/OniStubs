@@ -1,0 +1,1 @@
+dotnet msbuild /t:clean,rebuild,pack -p:IncludeContentInPack=false
