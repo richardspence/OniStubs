@@ -7,6 +7,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Assembly-CSharp", "Assembly
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Assembly-CSharp-firstpass", "Assembly-CSharp-firstpass\Assembly-CSharp-firstpass.csproj", "{5ADEFEB2-24FA-4FEB-A550-4A178A6C1364}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{754B2D3E-F40D-4983-AB6C-CA3826986F04}"
+	ProjectSection(SolutionItems) = preProject
+		Package.nuspec = Package.nuspec
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "T4Host", "T4Host\T4Host.csproj", "{0DAD20F4-7ED2-4509-B724-D32BFCCFF839}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +28,10 @@ Global
 		{5ADEFEB2-24FA-4FEB-A550-4A178A6C1364}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5ADEFEB2-24FA-4FEB-A550-4A178A6C1364}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5ADEFEB2-24FA-4FEB-A550-4A178A6C1364}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0DAD20F4-7ED2-4509-B724-D32BFCCFF839}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0DAD20F4-7ED2-4509-B724-D32BFCCFF839}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0DAD20F4-7ED2-4509-B724-D32BFCCFF839}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0DAD20F4-7ED2-4509-B724-D32BFCCFF839}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

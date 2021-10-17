@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>OniStubs</id>
+    <version>1.0.2</version>
+    <authors>Richard Spence</authors>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <license type="expression">MIT</license>
+    <projectUrl>https://github.com/richardspence/OniStubs</projectUrl>
+    <iconUrl>http://icon_url_here_or_delete_this_line/</iconUrl>
+    <description> Stub dlls used for modding Oxygen Not Included</description>
+    <releaseNotes>Initial package</releaseNotes>
+    <tags>Oni Oxygen not included</tags>
+    <dependencies>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="Assembly-CSharp\bin\Debug\Assembly-CSharp.dll" target="lib" />
+    <file src="Assembly-CSharp\bin\Debug\Assembly-CSharp-firstpass.dll" target="lib" />
+  </files>
+</package>
